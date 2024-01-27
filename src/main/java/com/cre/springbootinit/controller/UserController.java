@@ -1,6 +1,7 @@
 package com.cre.springbootinit.controller;
 
 import com.cre.springbootinit.constant.MessageConstant;
+import com.cre.springbootinit.exception.BusinessException;
 import com.cre.springbootinit.pojo.common.BaseResponse;
 import com.cre.springbootinit.pojo.entity.User;
 import com.cre.springbootinit.service.UserService;
@@ -49,7 +50,7 @@ public class UserController {
             userService.register(username, password);
             return BaseResponse.success();
         } else {
-            return BaseResponse.error(MessageConstant.USERNAME_EXIST);
+            throw new BusinessException(MessageConstant.USERNAME_EXIST);
         }
     }
 
@@ -65,7 +66,7 @@ public class UserController {
         // 1.根据用户名查询用户
         User loginUser = userService.getUserInfoByName(username);
         if (loginUser == null) {
-            return BaseResponse.error(MessageConstant.USERNAME_ERROR);
+            throw new BusinessException(MessageConstant.USERNAME_NOT_EXIST);
         }
         // 判断密码正确性
         if (Md5Util.getMD5String(password).equals(loginUser.getUserPassword())) {
@@ -79,7 +80,7 @@ public class UserController {
             operations.set(token, token, 1, TimeUnit.HOURS);
             return BaseResponse.success(token);
         }
-        return BaseResponse.error(MessageConstant.PASSWORD_ERROR);
+        throw new BusinessException(MessageConstant.PASSWORD_ERROR);
     }
 
     /**
@@ -138,17 +139,17 @@ public class UserController {
         String newPassword = params.get("new_pwd");
         String rePassword = params.get("re_pwd");
         if (!StringUtils.hasLength(oldPassword) || !StringUtils.hasLength(newPassword) || !StringUtils.hasLength(rePassword)) {
-            return BaseResponse.error(MessageConstant.PARAM_ERROR);
+            throw new BusinessException(MessageConstant.PARAM_ERROR);
         }
         // 原密码是否正确
         Map<String, Object> map = ThreadLocalUtil.get();
         String username = (String) map.get("username");
         User loginUser = userService.getUserInfoByName(username);
         if (!Md5Util.checkPassword(oldPassword, loginUser.getUserPassword())) {
-            return BaseResponse.error(MessageConstant.OLD_PWD_ERROR);
+            throw new BusinessException(MessageConstant.OLD_PWD_ERROR);
         }
         if (!newPassword.equals(rePassword)) {
-            return BaseResponse.error(MessageConstant.TWO_PWD_NOT_MATCH);
+            throw new BusinessException(MessageConstant.TWO_PWD_NOT_MATCH);
         }
         userService.updatePassword(newPassword);
         // 删除redis中的token
