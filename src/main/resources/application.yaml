@@ -1,11 +1,13 @@
 spring:
   # 配置数据库
+  # todo  配置MySQL
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/big_event
     username: root
     password: zxcvbnm123
   # 配置Redis
+  # todo  配置Redis
   data:
     redis:
       host: localhost
