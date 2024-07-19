@@ -19,6 +19,11 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(globalInterceptor)
                 // 排除登录和注册界面
-                .excludePathPatterns("/user/login", "/user/register");
+                .excludePathPatterns("/user/login", "/user/register")
+                // 排除swagger界面
+                .excludePathPatterns("/v3/api-docs/**", "/swagger-ui.html/**","/swagger-ui/**");
+
     }
+
+
 }

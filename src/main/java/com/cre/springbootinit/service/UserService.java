@@ -1,15 +1,25 @@
 package com.cre.springbootinit.service;
 
-import com.cre.springbootinit.pojo.entity.User;
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.cre.springbootinit.model.entity.User;
+import com.cre.springbootinit.model.request.user.UserRegisterRequest;
+import com.cre.springbootinit.model.request.user.UserUpdateInfoRequest;
+import com.cre.springbootinit.model.request.user.UserUpdatePwdRequest;
+import com.cre.springbootinit.model.response.user.UserInfoResponse;
+import com.cre.springbootinit.model.response.user.UserLoginResponse;
 
-public interface UserService {
-    User getUserInfoByName(String username);
+import java.util.Map;
 
-    void register(String username, String password);
+public interface UserService extends IService<User> {
+    UserInfoResponse getUserInfoByName(String userAccount);
 
-    void updateUserInfo(User user);
+    void register(UserRegisterRequest userRegisterRequest);
+
+    void updateUserInfo(UserUpdateInfoRequest userUpdateInfoRequest);
 
     void updateAvatar(String avatarUrl);
 
-    void updatePassword(String newPassword);
+    void updatePassword(UserUpdatePwdRequest userUpdatePwdRequest);
+
+    UserLoginResponse login(String userAccount, String userPassword);
 }
