@@ -82,4 +82,13 @@ public class User implements Serializable {
      */
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
+
+
+    /**
+     * 是否删除
+     */
+    @TableLogic
+    @TableField("isDelete")
+    private Integer isDelete;
+
 }

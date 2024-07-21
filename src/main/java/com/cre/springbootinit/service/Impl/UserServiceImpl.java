@@ -21,10 +21,12 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
@@ -40,7 +42,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public UserInfoResponse getUserInfoByName(String userAccount) {
         // 查询数据库，根据用户名获取用户信息
         QueryWrapper<User> wrapper = new QueryWrapper<>();
-        wrapper.select("*").like("user_account", userAccount);
+        wrapper.eq("user_account", userAccount);
         User user = userMapper.selectOne(wrapper);
 
         UserInfoResponse userInfoResponse = new UserInfoResponse();
@@ -59,25 +61,28 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (!userPassword.equals(checkPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, MessageConstant.TWO_PWD_NOT_MATCH);
         }
-        // 查询数据库是否已有账户名
-        QueryWrapper<User> wrapper = new QueryWrapper<>();
-        wrapper.select("*").eq("user_account", userAccount);
-        User user = userMapper.selectOne(wrapper);
-        if (user != null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, MessageConstant.USERNAME_ALREADY_EXIST);
+
+        synchronized (userAccount.intern()) {
+            // 查询数据库是否已有账户名
+            QueryWrapper<User> wrapper = new QueryWrapper<>();
+            wrapper.select("*").eq("user_account", userAccount);
+            User user = userMapper.selectOne(wrapper);
+            if (user != null) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, MessageConstant.USERNAME_ALREADY_EXIST);
+            }
+            // 首先对密码进行加密，保证安全性
+            String md5Password = Md5Util.getMD5String(userPassword);
+            user = User.builder().userAccount(userAccount).userPassword(md5Password).nickName(nickName).userEmail(userEmail).build();
+            // 将用户信息插入数据库
+            userMapper.insert(user);
         }
-        // 首先对密码进行加密，保证安全性
-        String md5Password = Md5Util.getMD5String(userPassword);
-        user = User.builder().userAccount(userAccount).userPassword(md5Password).nickName(nickName).userEmail(userEmail).build();
-        // 将用户信息插入数据库
-        userMapper.insert(user);
     }
 
     @Override
     public UserLoginResponse login(String userAccount, String userPassword) {
         // 根据用户名查询用户
         QueryWrapper<User> wrapper = new QueryWrapper<>();
-        wrapper.select("*").like("user_account", userAccount);
+        wrapper.eq("user_account", userAccount);
         User loginUser = userMapper.selectOne(wrapper);
         if (loginUser == null) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, MessageConstant.USERNAME_NOT_EXIST);
@@ -90,8 +95,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             claims.put("userAccount", loginUser.getUserAccount());
             String token = JwtUtil.genToken(claims);
             // 把token存入redis
-//            ValueOperations<String, String> operations = stringRedisTemplate.opsForValue();
-//            operations.set(token, token, 1, TimeUnit.HOURS);
+            ValueOperations<String, String> operations = stringRedisTemplate.opsForValue();
+            operations.set(token, token, 1, TimeUnit.HOURS);
 
             // 封装返回值
             UserLoginResponse userLoginResponse = new UserLoginResponse();
@@ -106,10 +111,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public void updateUserInfo(UserUpdateInfoRequest userUpdateInfoRequest) {
         Map<String, Object> map = ThreadLocalUtil.get();
         Integer id = (Integer) map.get("id");
-        User user = User.builder()
-                .id(id)
-                .nickName(userUpdateInfoRequest.getNickName())
-                .userEmail(userUpdateInfoRequest.getUserEmail()).build();
+        User user = User.builder().id(id).nickName(userUpdateInfoRequest.getNickName()).userEmail(userUpdateInfoRequest.getUserEmail()).build();
         userMapper.update(user, new QueryWrapper<User>().eq("id", id));
     }
 
@@ -131,7 +133,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         Map<String, Object> map = ThreadLocalUtil.get();
         String userAccount = (String) map.get("userAccount");
         QueryWrapper<User> wrapper = new QueryWrapper<>();
-        wrapper.select("*").like("user_account", userAccount);
+        wrapper.select("*").eq("user_account", userAccount);
         User loginUser = userMapper.selectOne(wrapper);
         if (!Md5Util.checkPassword(oldPassword, loginUser.getUserPassword())) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, MessageConstant.OLD_PWD_ERROR);
@@ -142,9 +144,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         String md5String = Md5Util.getMD5String(newPassword);
         // 2.更新数据库
-        User user = User.builder()
-                .userPassword(md5String)
-                .build();
+        User user = User.builder().userPassword(md5String).build();
         userMapper.update(user, new QueryWrapper<User>().eq("id", LoginUserInfoUtil.getUserId()));
     }
 

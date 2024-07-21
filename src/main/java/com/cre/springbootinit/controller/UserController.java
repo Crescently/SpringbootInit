@@ -64,7 +64,7 @@ public class UserController {
         String userAccount = userLoginRequest.getUserAccount();
         String userPassword = userLoginRequest.getUserPassword();
 
-        log.info("用户登录，用户名：{}，密码：{}", userAccount, userPassword);
+        log.info("用户登录，用户账号：{}，密码：{}", userAccount, userPassword);
         UserLoginResponse userLoginResponse = userService.login(userAccount, userPassword);
         return BaseResponse.success(userLoginResponse);
     }
@@ -79,7 +79,7 @@ public class UserController {
         // 使用ThreadLocal获取用户名
         Map<String, Object> map = ThreadLocalUtil.get();
         String userAccount = (String) map.get("userAccount");
-        log.info("当前登录的用户名：{}", userAccount);
+        log.info("当前登录的用户账号：{}", userAccount);
         // 2.查询数据库
         UserInfoResponse userInfoResponse = userService.getUserInfoByName(userAccount);
 
