@@ -1,12 +1,17 @@
 package com.cre.springbootinit.service.Impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cre.springbootinit.annotation.AuthCheck;
 import com.cre.springbootinit.common.ErrorCode;
 import com.cre.springbootinit.constant.MessageConstant;
+import com.cre.springbootinit.constant.UserConstant;
 import com.cre.springbootinit.exception.BusinessException;
 import com.cre.springbootinit.mapper.UserMapper;
 import com.cre.springbootinit.model.entity.User;
+import com.cre.springbootinit.model.enums.UserRoleEnum;
+import com.cre.springbootinit.model.request.admin.UpdateUserRoleRequest;
 import com.cre.springbootinit.model.request.user.UserRegisterRequest;
 import com.cre.springbootinit.model.request.user.UserUpdateInfoRequest;
 import com.cre.springbootinit.model.request.user.UserUpdatePwdRequest;
@@ -18,6 +23,7 @@ import com.cre.springbootinit.utils.LoginUserInfoUtil;
 import com.cre.springbootinit.utils.Md5Util;
 import com.cre.springbootinit.utils.ThreadLocalUtil;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -27,6 +33,8 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
+import static com.cre.springbootinit.constant.UserConstant.USER_LOGIN_STATE;
 
 @Service
 @Slf4j
@@ -39,7 +47,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private StringRedisTemplate stringRedisTemplate;
 
     @Override
-    public UserInfoResponse getUserInfoByName(String userAccount) {
+    public UserInfoResponse getUserInfoByAccount(String userAccount) {
         // 查询数据库，根据用户名获取用户信息
         QueryWrapper<User> wrapper = new QueryWrapper<>();
         wrapper.eq("user_account", userAccount);
@@ -55,7 +63,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         String userAccount = userRegisterRequest.getUserAccount();
         String userPassword = userRegisterRequest.getUserPassword();
         String checkPassword = userRegisterRequest.getCheckPassword();
-        String nickName = userRegisterRequest.getNickName();
+        String username = userRegisterRequest.getUsername();
         String userEmail = userRegisterRequest.getUserEmail();
         // 检查两次密码是否一致
         if (!userPassword.equals(checkPassword)) {
@@ -72,14 +80,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             }
             // 首先对密码进行加密，保证安全性
             String md5Password = Md5Util.getMD5String(userPassword);
-            user = User.builder().userAccount(userAccount).userPassword(md5Password).nickName(nickName).userEmail(userEmail).build();
+
+            user = User.builder().userAccount(userAccount).userPassword(md5Password).username(username).userEmail(userEmail)
+                    // 默认注册用户是普通用户
+                    .userRole(UserRoleEnum.USER.getValue()).build();
             // 将用户信息插入数据库
             userMapper.insert(user);
         }
     }
 
     @Override
-    public UserLoginResponse login(String userAccount, String userPassword) {
+    public UserLoginResponse login(String userAccount, String userPassword, HttpServletRequest request) {
         // 根据用户名查询用户
         QueryWrapper<User> wrapper = new QueryWrapper<>();
         wrapper.eq("user_account", userAccount);
@@ -102,16 +113,69 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             UserLoginResponse userLoginResponse = new UserLoginResponse();
             userLoginResponse.setToken(token);
             BeanUtils.copyProperties(loginUser, userLoginResponse);
+
+            request.getSession().setAttribute(USER_LOGIN_STATE, loginUser);
             return userLoginResponse;
         }
         throw new BusinessException(ErrorCode.PARAMS_ERROR, MessageConstant.PASSWORD_ERROR);
     }
 
+    /**
+     * 用户注销
+     *
+     * @param request
+     */
+    @Override
+    public boolean userLogout(HttpServletRequest request) {
+        if (request.getSession().getAttribute(USER_LOGIN_STATE) == null) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "未登录");
+        }
+        // 移除登录态
+        request.getSession().removeAttribute(USER_LOGIN_STATE);
+        return true;
+    }
+
+    /**
+     * 获取当前登录用户
+     *
+     * @param request
+     * @return
+     */
+    @Override
+    public User getLoginUser(HttpServletRequest request) {
+        // 先判断是否已登录
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        User currentUser = (User) userObj;
+        if (currentUser == null || currentUser.getId() == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+        // 从数据库查询（追求性能的话可以注释，直接走缓存）
+        long userId = currentUser.getId();
+        currentUser = this.getById(userId);
+        if (currentUser == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+        return currentUser;
+    }
+
+
+    @Override
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public void updateUserRole(UpdateUserRoleRequest updateUserRoleRequest) {
+        String userAccount = updateUserRoleRequest.getUserAccount();
+        String newUserRole = updateUserRoleRequest.getNewUserRole();
+
+        UpdateWrapper<User> updateWrapper = new UpdateWrapper<>();
+        updateWrapper.eq("user_account", userAccount).set("user_role", newUserRole);
+        userMapper.update(null, updateWrapper);
+    }
+
+
     @Override
     public void updateUserInfo(UserUpdateInfoRequest userUpdateInfoRequest) {
         Map<String, Object> map = ThreadLocalUtil.get();
         Integer id = (Integer) map.get("id");
-        User user = User.builder().id(id).nickName(userUpdateInfoRequest.getNickName()).userEmail(userUpdateInfoRequest.getUserEmail()).build();
+        User user = User.builder().id(id).username(userUpdateInfoRequest.getUsername()).userEmail(userUpdateInfoRequest.getUserEmail()).build();
         userMapper.update(user, new QueryWrapper<User>().eq("id", id));
     }
 

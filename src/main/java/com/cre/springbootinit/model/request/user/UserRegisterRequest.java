@@ -44,7 +44,7 @@ public class UserRegisterRequest implements Serializable {
      */
     @NotEmpty
     @Pattern(regexp = "\\S{1,10}$", message = "用户名长度为1-10个非空字符")
-    private String nickName;
+    private String username;
 
     /**
      * 邮箱

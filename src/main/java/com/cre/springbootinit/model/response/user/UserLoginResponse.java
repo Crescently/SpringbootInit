@@ -16,19 +16,16 @@ public class UserLoginResponse implements Serializable {
 
     private String token;
 
-    private Integer id;//主键ID
+    private Integer id;
 
-    private String userAccount;//用户名
+    private String userAccount;
 
     private String userRole;
 
-    private String nickName;//昵称
+    private String username;
 
-    private String userEmail;//邮箱
+    private String userEmail;
 
-    private String userPic;//用户头像地址
+    private String userPic;
 
-    private LocalDateTime createTime;//创建时间
-
-    private LocalDateTime updateTime;//更新时间
 }

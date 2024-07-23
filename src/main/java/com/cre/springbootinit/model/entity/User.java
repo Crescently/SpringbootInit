@@ -38,12 +38,12 @@ public class User implements Serializable {
     /**
      * 用户密码
      */
-    @JsonIgnore // 转成JSON时忽略该字段
     private String userPassword;
 
     /**
      * 用户角色
      */
+    @TableField("user_role")
     private String userRole;
 
     /**
@@ -51,8 +51,8 @@ public class User implements Serializable {
      */
     @NotEmpty
     @Pattern(regexp = "\\S{1,10}$", message = "用户名长度为1-10个非空字符")
-    @TableField("nickName")
-    private String nickName;
+    @TableField("username")
+    private String username;
 
     /**
      * 用户邮箱

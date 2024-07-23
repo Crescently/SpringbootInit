@@ -3,6 +3,7 @@ package com.cre.springbootinit.controller;
 import com.cre.springbootinit.common.BaseResponse;
 import com.cre.springbootinit.common.ErrorCode;
 import com.cre.springbootinit.exception.BusinessException;
+import com.cre.springbootinit.model.enums.UserRoleEnum;
 import com.cre.springbootinit.model.request.user.UserLoginRequest;
 import com.cre.springbootinit.model.request.user.UserRegisterRequest;
 import com.cre.springbootinit.model.request.user.UserUpdateInfoRequest;
@@ -12,6 +13,7 @@ import com.cre.springbootinit.model.response.user.UserLoginResponse;
 import com.cre.springbootinit.service.UserService;
 import com.cre.springbootinit.utils.ThreadLocalUtil;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.constraints.URL;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -20,6 +22,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/user")
@@ -56,17 +59,36 @@ public class UserController {
      * @return BaseResponse
      */
     @PostMapping("/login")
-    public BaseResponse<UserLoginResponse> userLogin(@Validated @RequestBody UserLoginRequest userLoginRequest) {
+    public BaseResponse<UserLoginResponse> userLogin(@Validated @RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
         if (userLoginRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-
         String userAccount = userLoginRequest.getUserAccount();
         String userPassword = userLoginRequest.getUserPassword();
 
-        log.info("用户登录，用户账号：{}，密码：{}", userAccount, userPassword);
-        UserLoginResponse userLoginResponse = userService.login(userAccount, userPassword);
+        // 判断用户是否处于封禁状态
+        UserInfoResponse userinfo = userService.getUserInfoByAccount(userAccount);
+        if (Objects.equals(userinfo.getUserRole(), UserRoleEnum.BAN.getValue())){
+                throw new BusinessException(ErrorCode.FORBIDDEN_ERROR);
+        }
+            log.info("用户登录，用户账号：{}，密码：{}", userAccount, userPassword);
+        UserLoginResponse userLoginResponse = userService.login(userAccount, userPassword,request);
         return BaseResponse.success(userLoginResponse);
+    }
+
+    /**
+     * 用户注销
+     *
+     * @param request HttpServletRequest
+     * @return BaseResponse
+     */
+    @PostMapping("/logout")
+    public BaseResponse<Boolean> userLogout(HttpServletRequest request) {
+        if (request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        boolean result = userService.userLogout(request);
+        return BaseResponse.success(result);
     }
 
     /**
@@ -81,8 +103,7 @@ public class UserController {
         String userAccount = (String) map.get("userAccount");
         log.info("当前登录的用户账号：{}", userAccount);
         // 2.查询数据库
-        UserInfoResponse userInfoResponse = userService.getUserInfoByName(userAccount);
-
+        UserInfoResponse userInfoResponse = userService.getUserInfoByAccount(userAccount);
         return BaseResponse.success(userInfoResponse);
     }
 
@@ -119,12 +140,14 @@ public class UserController {
      * @return BaseResponse
      */
     @PatchMapping("/updatePwd")
-    public BaseResponse updatePassword(@RequestBody UserUpdatePwdRequest userUpdatePwdRequest, @RequestHeader("Authorization") String token) {
+    public BaseResponse updatePassword(@RequestBody UserUpdatePwdRequest userUpdatePwdRequest, @RequestHeader("Authorization") String token,HttpServletRequest request) {
         log.info("更新密码");
         userService.updatePassword(userUpdatePwdRequest);
         // 删除redis中的token
         ValueOperations<String, String> operations = stringRedisTemplate.opsForValue();
         operations.getOperations().delete(token);
+        // 执行退出操作
+        userService.userLogout(request);
 
         return BaseResponse.success();
     }

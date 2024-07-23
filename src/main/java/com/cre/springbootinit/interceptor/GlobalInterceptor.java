@@ -28,12 +28,11 @@ public class GlobalInterceptor implements HandlerInterceptor {
 
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         String token = request.getHeader("Authorization");
-        // 验证token是否有效，如果无效则返回错误信息
         try {
+            // 验证token是否有效，如果无效则返回错误信息
             if (token == null || token.isEmpty()) {
                 throw new RuntimeException("没有token，请确认是否登录");
             }
-
             // 从redis中获取token
             ValueOperations<String, String> operations = stringRedisTemplate.opsForValue();
             String redisToken = operations.get(token);

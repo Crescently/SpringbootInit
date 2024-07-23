@@ -18,11 +18,11 @@ public class UserUpdateInfoRequest implements Serializable {
 
     @NotEmpty
     @Pattern(regexp = "\\S{1,10}$", message = "用户名长度为1-10个非空字符")
-    private String nickName;//昵称
+    private String username;
 
     @Email
     @NotEmpty //非空字符串
-    private String userEmail;//邮箱
+    private String userEmail;
 
 
 }

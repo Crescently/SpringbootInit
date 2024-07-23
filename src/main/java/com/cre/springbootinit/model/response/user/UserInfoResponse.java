@@ -18,19 +18,24 @@ public class UserInfoResponse implements Serializable {
      */
     private Integer id;
     /**
-     * 用户名
+     * 账号
      */
     private String userAccount;
 
     /**
-     * 昵称
+     * 用户名
      */
-    private String nickName;
+    private String username;
 
     /**
      * 邮箱
      */
     private String userEmail;
+
+    /**
+     * 用户角色
+     */
+    private String userRole;
 
     /**
      * 用户头像地址
